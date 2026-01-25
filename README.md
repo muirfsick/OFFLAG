@@ -1,16 +1,25 @@
-# client
+# OffLag
 
-A new Flutter project.
+OffLag is a Flutter client app for the OffLag VPN service. It includes user onboarding,
+server selection, and billing flows, and builds Xray/Sing-box configs for the tunnel.
+
+## Features
+- Email-based onboarding and profile management
+- Server list with latency/ping indicators
+- Balance, promo codes, and top-up flows
+- Desktop window sizing and theming
+
+## Tech Stack
+- Flutter (Dart)
+- dio, flutter_secure_storage, shared_preferences
+- Xray and Sing-box config builders
 
 ## Getting Started
+```bash
+flutter pub get
+flutter run
+```
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Notes
+- Desktop window size is fixed to 460x800.
+- App name and bundle IDs are set to OffLag.
