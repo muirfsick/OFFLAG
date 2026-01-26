@@ -3,6 +3,7 @@ import 'dart:io' show Socket;
 import 'package:flutter/foundation.dart';
 
 import 'models/vpn_node.dart';
+import 'storage/token_store.dart';
 
 /// Текущая сессия пользователя.
 ///
@@ -27,9 +28,55 @@ class Session {
 ///
 /// Сервер ожидает **«сырой» JWT без префикса `Bearer`**, поэтому заголовок
 /// формируется как `Authorization: <jwt>`.
+const _apiBaseUrl = 'https://api.lisovcoff.ru';
+
+final _refreshDio = Dio(
+  BaseOptions(
+    baseUrl: _apiBaseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+  ),
+);
+
+Future<bool>? _refreshFuture;
+
+Future<bool> _refreshSession() {
+  if (_refreshFuture != null) return _refreshFuture!;
+  final f = _doRefresh();
+  _refreshFuture = f.whenComplete(() => _refreshFuture = null);
+  return _refreshFuture!;
+}
+
+Future<bool> refreshSession() => _refreshSession();
+
+Future<bool> _doRefresh() async {
+  final refresh = await TokenStore.refreshToken;
+  if (refresh == null || refresh.isEmpty) return false;
+  try {
+    final resp = await _refreshDio.post('/auth/refresh', data: {
+      'refresh_token': refresh,
+    });
+    final data = resp.data is Map ? resp.data as Map : <String, dynamic>{};
+    final token = (data['token'] ?? '') as String;
+    final newRefresh = (data['refresh_token'] ?? '') as String;
+    final email = (data['email'] ?? '') as String;
+    if (token.isEmpty) return false;
+    Session.token = token;
+    if (email.isNotEmpty) Session.email = email;
+    if (email.isNotEmpty) {
+      await TokenStore.save(token, email, refreshToken: newRefresh.isNotEmpty ? newRefresh : refresh);
+    } else {
+      await TokenStore.updateTokens(token, refreshToken: newRefresh.isNotEmpty ? newRefresh : refresh);
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 final dio = Dio(
   BaseOptions(
-    baseUrl: 'https://api.lisovcoff.ru',
+    baseUrl: _apiBaseUrl,
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
   ),
@@ -47,6 +94,23 @@ final dio = Dio(
           options.headers['Authorization'] = t;
         }
         handler.next(options);
+      },
+      onError: (error, handler) async {
+        final status = error.response?.statusCode ?? 0;
+        final opts = error.requestOptions;
+        if (status == 401 && opts.extra['noAuthRetry'] != true) {
+          final ok = await _refreshSession();
+          if (ok) {
+            opts.extra['noAuthRetry'] = true;
+            final t = Session.token;
+            if (t != null && t.isNotEmpty) {
+              opts.headers['Authorization'] = t;
+            }
+            final res = await dio.fetch(opts);
+            return handler.resolve(res);
+          }
+        }
+        handler.next(error);
       },
     ),
   );

@@ -160,13 +160,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'code': code,
       });
       final token = (res.data?['token'] as String?) ?? '';
+      final refresh = (res.data?['refresh_token'] as String?) ?? '';
       if (token.isNotEmpty) {
         // обновляем in-memory сессию
         Session.token = token;
         Session.email = newEmail;
 
         // и перезаписываем персистентный токен 👇
-        await TokenStore.save(token, newEmail);
+        await TokenStore.save(token, newEmail, refreshToken: refresh);
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -445,6 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _openPromoDialog,
+                        style: OutlinedButton.styleFrom(alignment: Alignment.center),
                         child: const Center(
                           child: Text(
                             'Ввести промокод',

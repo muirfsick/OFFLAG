@@ -142,6 +142,7 @@ class _BootState extends State<_Boot> {
   Future<void> _go() async {
     final tok = await TokenStore.token;
     final mail = await TokenStore.email;
+    final refresh = await TokenStore.refreshToken;
 
     if (!mounted) return;
     if (tok != null && tok.isNotEmpty) {
@@ -151,6 +152,18 @@ class _BootState extends State<_Boot> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainTabs()),
       );
+    } else if (refresh != null && refresh.isNotEmpty) {
+      final ok = await refreshSession();
+      if (!mounted) return;
+      if (ok) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainTabs()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const WelcomePage()),
+        );
+      }
     } else {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const WelcomePage()),

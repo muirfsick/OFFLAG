@@ -174,6 +174,7 @@ class _CodeScreenState extends State<CodeScreen> with SingleTickerProviderStateM
       } else {
         // существующий пользователь — сразу получаем токен
         final token = data['token'] as String?;
+        final refresh = data['refresh_token'] as String?;
         if (token == null || token.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Не получен токен. Повторите вход.')),
@@ -186,7 +187,7 @@ class _CodeScreenState extends State<CodeScreen> with SingleTickerProviderStateM
         Session.email = widget.email;
 
         // ...и сохраняем в SharedPreferences 👇
-        await TokenStore.save(token, widget.email);
+        await TokenStore.save(token, widget.email, refreshToken: refresh);
 
         // и дальше уже в приложение
         Navigator.pushReplacement(

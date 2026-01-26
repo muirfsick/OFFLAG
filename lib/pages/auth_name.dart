@@ -67,6 +67,7 @@ class _AuthNamePageState extends State<AuthNamePage> {
 
       final data = res.data is Map ? (res.data as Map) : {};
       final token = (data['token'] ?? '') as String;
+      final refresh = (data['refresh_token'] ?? '') as String;
 
       if (token.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +81,7 @@ class _AuthNamePageState extends State<AuthNamePage> {
       Session.email = widget.email;
 
       // И ПЕРСИСТИМ токен в SharedPreferences 👇
-      await TokenStore.save(token, widget.email);
+      await TokenStore.save(token, widget.email, refreshToken: refresh);
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
