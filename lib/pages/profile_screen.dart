@@ -21,6 +21,7 @@ class ProfileScreen extends StatefulWidget {
     required this.me,
     required this.loadingMe,
     required this.onRefreshMe,
+    required this.onDisconnectVpn,
   });
 
   /// Загруженный профиль пользователя, если доступен.
@@ -31,6 +32,9 @@ class ProfileScreen extends StatefulWidget {
 
   /// Обновление данных профиля по жесту pull-to-refresh.
   final Future<void> Function() onRefreshMe;
+
+  /// Отключить VPN перед выходом из аккаунта.
+  final Future<void> Function() onDisconnectVpn;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -91,6 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Выход из аккаунта: вызывает `/logout_device`, очищает сессию,
   /// чистит сохранённый токен и переводит на экран входа.
   Future<void> _logout() async {
+    await widget.onDisconnectVpn();
     try {
       await dio.post('/logout_device');
     } catch (_) {}
@@ -441,7 +446,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: OutlinedButton(
                         onPressed: _openPromoDialog,
                         child: const Center(
-                          child: Text('Ввести промокод'),
+                          child: Text(
+                            'Ввести промокод',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),

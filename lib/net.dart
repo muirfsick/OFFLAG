@@ -62,12 +62,12 @@ Future<List<VpnNode>> fetchVpnNodes() async {
 /// Возвращаем среднее значение по успешным попыткам,
 /// с минимальным визуальным порогом (например, 42 мс).
 Future<int?> measureTcpPing(
-    String host,
-    int port, {
-      Duration timeout = const Duration(seconds: 2),
-      bool clampForUi = true, // 👈 по умолчанию — честное значение
-    }) async {
-  const tries = 3;
+  String host,
+  int port, {
+  Duration timeout = const Duration(seconds: 2),
+  bool clampForUi = true, // 👈 по умолчанию — честное значение
+  int tries = 3,
+}) async {
   const minVisualPingMs = 42;
 
   int sum = 0;
@@ -132,7 +132,11 @@ double _load(VpnNode n) {
 /// 1) меряет TCP-пинг до каждой,
 /// 2) выбирает лучшую по приоритету → нагрузке → пингу,
 /// 3) возвращает лучшую и карту id → pingMs.
-Future<({VpnNode? best, Map<int, int> pingsMs})> findBestNode(List<VpnNode> nodes) async {
+Future<({VpnNode? best, Map<int, int> pingsMs})> findBestNode(
+  List<VpnNode> nodes, {
+  Duration timeout = const Duration(seconds: 2),
+  int tries = 3,
+}) async {
   final Map<int, int> pings = {};
   if (nodes.isEmpty) return (best: null, pingsMs: pings);
 
@@ -145,7 +149,12 @@ Future<({VpnNode? best, Map<int, int> pingsMs})> findBestNode(List<VpnNode> node
       if (node == null) break;
       final hp = hostPortFromNode(node);
       if (hp == null) continue;
-      final ping = await measureTcpPing(hp.host, hp.port);
+      final ping = await measureTcpPing(
+        hp.host,
+        hp.port,
+        timeout: timeout,
+        tries: tries,
+      );
       if (ping != null) {
         pings[node.id] = ping;
         node.pingMs = ping;

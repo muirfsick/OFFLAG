@@ -77,6 +77,7 @@ class VpnController {
   final FlutterV2ray _v2ray = FlutterV2ray();
   StreamSubscription<VlessStatus>? _v2raySub;
   bool _androidInitialized = false;
+  static const List<String> _kAndroidDnsServers = ['1.1.1.1', '8.8.8.8'];
 
   /// Реактивный статус (true — VPN запущен).
   final ValueNotifier<bool> _status = ValueNotifier<bool>(false);
@@ -501,19 +502,36 @@ class VpnController {
 
       final url = _buildVlessUrl(node);
       final parsed = FlutterV2ray.parseFromURL(url);
-      final config = parsed.getFullConfiguration();
+      final config = _applyDnsOverrides(
+        parsed.getFullConfiguration(),
+        _kAndroidDnsServers,
+      );
       final remark = parsed.remark.isNotEmpty ? parsed.remark : node.name;
 
       await _v2ray.startVless(
         remark: remark,
         config: config,
         bypassSubnets: const ['0.0.0.0/0', '::/0'],
+        dnsServers: _kAndroidDnsServers,
       );
 
       return true;
     } catch (e, st) {
       debugPrint('[VpnController][Android] failed to start: $e\n$st');
       return false;
+    }
+  }
+
+  String _applyDnsOverrides(String config, List<String> dnsServers) {
+    try {
+      final decoded = jsonDecode(config);
+      if (decoded is! Map<String, dynamic>) return config;
+      decoded['dns'] = {
+        'servers': dnsServers,
+      };
+      return jsonEncode(decoded);
+    } catch (_) {
+      return config;
     }
   }
 

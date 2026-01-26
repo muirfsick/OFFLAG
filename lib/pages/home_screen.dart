@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme.dart';
@@ -187,9 +188,19 @@ class HomeScreen extends StatelessWidget {
               width: Ui.mainWidth(context),
               height: Ui.mainWidth(context) * 0.18,
               child: ElevatedButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ServicesPage()),
-                ),
+                onPressed: () {
+                  if (Platform.isAndroid) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('В разработке. Будет доступно в следующих обновлениях'),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ServicesPage()),
+                  );
+                },
                 child: const Text('Сервисы'),
               ),
             ),

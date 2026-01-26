@@ -79,11 +79,15 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _loadVpn() async {
+  Future<void> _loadVpn({bool fast = false}) async {
     setState(() => _loadingVpn = true);
     try {
       final nodes = await fetchVpnNodes();
-      final result = await findBestNode(nodes);
+      final result = await findBestNode(
+        nodes,
+        timeout: fast ? const Duration(seconds: 1) : const Duration(seconds: 2),
+        tries: fast ? 1 : 3,
+      );
       if (!mounted) return;
 
       setState(() {
@@ -113,12 +117,75 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _disconnectVpnForLogout() async {
+    if (!_connected) return;
+    await _vpn.disconnect();
+    if (!mounted) return;
+    setState(() => _connected = false);
+  }
+
   void _startPingTimer() {
     _pingTimer?.cancel();
     _pingTimer = Timer.periodic(const Duration(minutes: 1), (_) async {
       if (!_connected) return;
       await _refreshPing();
     });
+  }
+
+  Future<void> _waitForVpnLoad() async {
+    // Wait until the initial node scan finishes.
+    while (_loadingVpn && mounted) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<VpnNode?> _ensureBestNode({int attempts = 3}) async {
+    for (var i = 0; i < attempts && mounted; i++) {
+      if (_bestNode != null) return _bestNode;
+
+      if (_loadingVpn) {
+        await _waitForVpnLoad();
+      } else {
+        await _loadVpn(fast: true);
+      }
+
+      if (_bestNode != null) return _bestNode;
+
+      // Short backoff before next attempt.
+      await Future.delayed(const Duration(milliseconds: 700));
+    }
+    return _bestNode;
+  }
+
+  VoidCallback _showFindingServerDialog() {
+    final nav = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 10),
+              Text('Ищем лучший сервер...', textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      ),
+    );
+    return () {
+      if (nav.canPop()) nav.pop();
+    };
   }
 
   /// Переключает VPN: запускает или останавливает подключение.
@@ -140,9 +207,13 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     // Включение — нужна текущая нода.
     var node = _bestNode;
 
-    if (node == null && !_loadingVpn) {
-      await _loadVpn();
-      node = _bestNode;
+    if (node == null) {
+      final closeDialog = _showFindingServerDialog();
+      try {
+        node = await _ensureBestNode(attempts: 3);
+      } finally {
+        if (mounted) closeDialog();
+      }
     }
 
     if (node == null) {
@@ -227,6 +298,7 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
         me: _me,
         loadingMe: _loadingMe,
         onRefreshMe: _fetchMe,
+        onDisconnectVpn: _disconnectVpnForLogout,
       ),
     ];
 
@@ -234,7 +306,7 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
       body: SafeArea(
         child: PageView(
           controller: _pageCtrl,
-          physics: const NeverScrollableScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           onPageChanged: (i) => setState(() => _index = i),
           children: pages,
         ),
