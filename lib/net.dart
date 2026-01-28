@@ -74,7 +74,7 @@ Future<bool> _doRefresh() async {
   }
 }
 
-final dio = Dio(
+final Dio dio = Dio(
   BaseOptions(
     baseUrl: _apiBaseUrl,
     connectTimeout: const Duration(seconds: 10),

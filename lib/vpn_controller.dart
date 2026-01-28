@@ -559,6 +559,6 @@ class VpnController {
 
     return 'vless://$uuid@$serverHost:$serverPort?'
         'type=xhttp&encryption=none&security=reality&pbk=$publicKey'
-        '&fp=chrome&sni=google.com&sid=$shortId&spx=%2F#$remark';
+        '&fp=chrome&sni=web.max.ru&sid=$shortId&spx=%2F#$remark';
   }
 }
