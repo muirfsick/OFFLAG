@@ -116,8 +116,11 @@ final Dio dio = Dio(
   );
 
 /// Забираем список нод с бэка.
-Future<List<VpnNode>> fetchVpnNodes() async {
-  final resp = await dio.get('/vpn/nodes');
+Future<List<VpnNode>> fetchVpnNodes({bool includeAll = false}) async {
+  final resp = await dio.get(
+    '/vpn/nodes',
+    queryParameters: includeAll ? {'all': '1'} : null,
+  );
   final data = resp.data as List<dynamic>;
   return data.map((e) => VpnNode.fromJson(e as Map<String, dynamic>)).toList();
 }

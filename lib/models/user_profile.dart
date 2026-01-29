@@ -12,6 +12,10 @@ class UserProfile {
   final double? priceOverride;
   final double effectivePrice;
   final int activeSessions;
+  final bool premiumActive;
+  final int premiumUsersLeft;
+  final int premiumDaysLeft;
+  final DateTime? premiumExpiresAt;
 
   UserProfile({
     required this.id,
@@ -26,6 +30,10 @@ class UserProfile {
     required this.priceOverride,
     required this.effectivePrice,
     required this.activeSessions,
+    required this.premiumActive,
+    required this.premiumUsersLeft,
+    required this.premiumDaysLeft,
+    required this.premiumExpiresAt,
   });
 
   factory UserProfile.fromMap(Map m) {
@@ -40,6 +48,7 @@ class UserProfile {
     }
 
     final plan = (m['plan'] ?? {}) as Map;
+    final premium = (m['premium'] ?? {}) as Map;
 
     return UserProfile(
       id: int.tryParse('${m['id'] ?? 0}') ?? 0,
@@ -54,6 +63,10 @@ class UserProfile {
       priceOverride: _numOrNull(m['price_override']),
       effectivePrice: double.tryParse('${m['effective_price'] ?? 0}') ?? 0.0,
       activeSessions: int.tryParse('${m['active_sessions'] ?? 0}') ?? 0,
+      premiumActive: premium['active'] == true,
+      premiumUsersLeft: int.tryParse('${premium['users_left'] ?? 0}') ?? 0,
+      premiumDaysLeft: int.tryParse('${premium['days_left'] ?? 0}') ?? 0,
+      premiumExpiresAt: _dt(premium['expires_at']),
     );
   }
 

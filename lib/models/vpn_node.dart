@@ -23,6 +23,7 @@ class VpnNode {
   final String uuid;
   final String publicKey;
   final String shortId;
+  final bool premium;
 
   /// Пинг, который меряем на клиенте
   int? pingMs;
@@ -40,6 +41,7 @@ class VpnNode {
     required this.uuid,
     required this.publicKey,
     required this.shortId,
+    required this.premium,
     this.pingMs,
   });
 
@@ -57,6 +59,7 @@ class VpnNode {
       uuid: json['uuid'] as String? ?? '',
       publicKey: json['public_key'] as String? ?? '',
       shortId: json['short_id'] as String? ?? '',
+      premium: json['premium'] == true,
     );
   }
 }

@@ -240,6 +240,7 @@ class _TopUpSheetState extends State<TopUpSheet> {
         'description': 'Пополнение баланса в приложении',
       });
 
+      if (!ctx.mounted) return;
       final data = res.data as Map<String, dynamic>? ?? {};
       final url = (data['confirmation_url'] as String?) ?? '';
 
@@ -265,6 +266,7 @@ class _TopUpSheetState extends State<TopUpSheet> {
         mode: LaunchMode.externalApplication,
       );
 
+      if (!ctx.mounted) return;
       if (!ok) {
         ScaffoldMessenger.of(ctx).showSnackBar(
           const SnackBar(content: Text('Не удалось открыть страницу оплаты')),
@@ -281,6 +283,7 @@ class _TopUpSheetState extends State<TopUpSheet> {
         Navigator.pop(ctx);
       }
     } catch (e) {
+      if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
         const SnackBar(content: Text('Ошибка при создании платежа')),
       );
@@ -298,19 +301,12 @@ class _TopUpSheetState extends State<TopUpSheet> {
       uri,
       mode: LaunchMode.externalApplication,
     );
-    if (!ok && mounted) {
+    if (!ctx.mounted) return;
+    if (!ok) {
       ScaffoldMessenger.of(ctx).showSnackBar(
         const SnackBar(content: Text('Не удалось открыть публичную оферту')),
       );
     }
-  }
-
-  /// Заглушка, если когда-нибудь понадобится.
-  void _fakePay(BuildContext ctx) {
-    Navigator.pop(ctx);
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      const SnackBar(content: Text('Заглушка оплаты')),
-    );
   }
 }
 

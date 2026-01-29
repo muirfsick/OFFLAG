@@ -15,14 +15,6 @@ class TokenStore {
     if (refreshToken != null && refreshToken.isNotEmpty) {
       await _secure.write(key: _kRefresh, value: refreshToken);
     }
-
-    // Keep a SharedPreferences copy for migration/compatibility.
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_kToken, token);
-    await p.setString(_kEmail, email);
-    if (refreshToken != null && refreshToken.isNotEmpty) {
-      await p.setString(_kRefresh, refreshToken);
-    }
   }
 
   static Future<String?> get token async {
@@ -34,6 +26,7 @@ class TokenStore {
     final legacy = p.getString(_kToken);
     if (legacy != null && legacy.isNotEmpty) {
       await _secure.write(key: _kToken, value: legacy);
+      await p.remove(_kToken);
     }
     return legacy;
   }
@@ -47,6 +40,7 @@ class TokenStore {
     final legacy = p.getString(_kEmail);
     if (legacy != null && legacy.isNotEmpty) {
       await _secure.write(key: _kEmail, value: legacy);
+      await p.remove(_kEmail);
     }
     return legacy;
   }
@@ -60,15 +54,6 @@ class TokenStore {
     if (email.isNotEmpty) {
       await _secure.write(key: _kEmail, value: email);
     }
-
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_kToken, token);
-    if (refreshToken != null && refreshToken.isNotEmpty) {
-      await p.setString(_kRefresh, refreshToken);
-    }
-    if (email.isNotEmpty) {
-      await p.setString(_kEmail, email);
-    }
   }
 
   static Future<String?> get refreshToken async {
@@ -79,6 +64,7 @@ class TokenStore {
     final legacy = p.getString(_kRefresh);
     if (legacy != null && legacy.isNotEmpty) {
       await _secure.write(key: _kRefresh, value: legacy);
+      await p.remove(_kRefresh);
     }
     return legacy;
   }

@@ -58,7 +58,8 @@ class HomeScreen extends StatelessWidget {
     final greetName = ((me?.nickname ?? '').isNotEmpty) ? me!.nickname : 'друг';
     final monthly = (me?.effectivePrice ?? 0) > 0 ? me!.effectivePrice : 60.0;
     final dailyCost = monthly / 30.0;
-    final canUse = (me?.balance ?? 0.0) >= dailyCost;
+    final hasPremium = me?.premiumActive == true;
+    final canUse = hasPremium || (me?.balance ?? 0.0) >= dailyCost;
 
     return RefreshIndicator(
       onRefresh: onRefreshMe,

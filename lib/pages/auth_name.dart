@@ -69,6 +69,7 @@ class _AuthNamePageState extends State<AuthNamePage> {
       final token = (data['token'] ?? '') as String;
       final refresh = (data['refresh_token'] ?? '') as String;
 
+      if (!mounted) return;
       if (token.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Не получен токен. Повторите ещё раз.')),
@@ -89,6 +90,7 @@ class _AuthNamePageState extends State<AuthNamePage> {
             (_) => false,
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ник уже занят или ошибка')),
       );

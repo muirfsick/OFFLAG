@@ -189,6 +189,7 @@ class _CodeScreenState extends State<CodeScreen> with SingleTickerProviderStateM
         // ...и сохраняем в SharedPreferences 👇
         await TokenStore.save(token, widget.email, refreshToken: refresh);
 
+        if (!mounted) return;
         // и дальше уже в приложение
         Navigator.pushReplacement(
           context,

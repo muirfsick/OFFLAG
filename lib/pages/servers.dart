@@ -14,7 +14,8 @@ import '../models/vpn_node.dart';
 ///  - считает загрузку как online * 100 / 40;
 /// По нажатию "Выбрать" возвращает выбранную ноду через Navigator.pop.
 class ServersPage extends StatefulWidget {
-  const ServersPage({super.key});
+  final bool includeAll;
+  const ServersPage({super.key, this.includeAll = false});
 
   @override
   State<ServersPage> createState() => _ServersPageState();
@@ -40,7 +41,7 @@ class _ServersPageState extends State<ServersPage> {
 
     try {
       // 1) забираем список нод с бэка
-      final nodes = await fetchVpnNodes();
+      final nodes = await fetchVpnNodes(includeAll: widget.includeAll);
 
       // 2) для каждой ноды меряем пинг
       for (final node in nodes) {
@@ -193,11 +194,37 @@ class _ServersPageState extends State<ServersPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _displayName(node),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _displayName(node),
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (node.premium) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1F2937),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: const Color(0xFF334155)),
+                                ),
+                                child: const Text(
+                                  'PREMIUM',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    letterSpacing: 0.4,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Text(

@@ -500,13 +500,20 @@ class VpnController {
       final allowed = await _v2ray.requestPermission();
       if (!allowed) return false;
 
+      debugPrint('[VpnController][Android] node id=${node.id} name="${node.name}"');
+      debugPrint('[VpnController][Android] serverHost="${node.serverHost}" baseUrl="${node.baseUrl}"');
+      debugPrint('[VpnController][Android] uuid="${node.uuid}" publicKey="${node.publicKey}" shortId="${node.shortId}"');
+
       final url = _buildVlessUrl(node);
+      debugPrint('[VpnController][Android] vless url: $url');
       final parsed = FlutterV2ray.parseFromURL(url);
       final config = _applyDnsOverrides(
         parsed.getFullConfiguration(),
         _kAndroidDnsServers,
       );
       final remark = parsed.remark.isNotEmpty ? parsed.remark : node.name;
+
+      debugPrint('[VpnController][Android] config preview: ${config.length} bytes');
 
       await _v2ray.startVless(
         remark: remark,
@@ -538,6 +545,9 @@ class VpnController {
   Future<void> _disconnectAndroid() async {
     try {
       await _v2ray.stopVless();
+      await _v2raySub?.cancel();
+      _v2raySub = null;
+      _status.value = false;
     } catch (e, st) {
       debugPrint('[VpnController][Android] failed to stop: $e\n$st');
     }

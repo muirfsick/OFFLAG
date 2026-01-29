@@ -129,6 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       builder: (_) => const ChangeEmailSheet(),
     );
+    if (!mounted) return;
     if (newEmail == null) return;
 
     try {
@@ -141,6 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       return;
     }
+    if (!mounted) return;
 
     final code = await showModalBottomSheet<String>(
       context: context,
@@ -152,6 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       builder: (_) => ConfirmEmailCodeSheet(email: newEmail),
     );
+    if (!mounted) return;
     if (code == null) return;
 
     try {
@@ -208,6 +211,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(content: Text('Не удалось применить промокод')),
       );
     }
+  }
+
+  /// Открывает модальное окно ввода премиум-кода и активирует доступ.
+  Future<void> _openPremiumDialog() async {
+    final code = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: kBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(kRadiusXXL)),
+      ),
+      builder: (ctx) => const PromoCodeSheet(),
+    );
+    if (code == null) return;
+    try {
+      await dio.post('/premium/activate', data: {'code': code});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Премиум-код активирован')),
+      );
+      await widget.onRefreshMe();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось активировать премиум-код')),
+      );
+    }
+  }
+
+  Future<void> _openDisablePremiumDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Expanded(child: Text('Отключить премиум')),
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Напишите нам в поддержку на сайте.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openUrl('https://offlag.ru');
+            },
+            child: const Text('Перейти на сайт'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Открывает внешний URL в браузере.
@@ -348,15 +408,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 6),
                 _kv(context, 'Email', me?.email ?? '—'),
                 const SizedBox(height: 6),
-                _kv(
-                  context,
-                  'Тариф',
-                  me == null
-                      ? '—'
-                      : '${me.planName.isEmpty ? me.planCode : me.planName}'
-                      '${me.effectivePrice > 0 ? '${me.formattedEffective} ₽/мес' : ''}',
-                ),
-                const SizedBox(height: 6),
+                if (me?.premiumActive != true) ...[
+                  _kv(
+                    context,
+                    'Тариф',
+                    me == null
+                        ? '—'
+                        : '${me.planName.isEmpty ? me.planCode : me.planName}'
+                        '${me.effectivePrice > 0 ? '${me.formattedEffective} ₽/мес' : ''}',
+                  ),
+                  const SizedBox(height: 6),
+                ],
                 _kv(
                   context,
                   'Активных сессий',
@@ -395,68 +457,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Баланс',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${_fmtMoney(me?.balance ?? 0)} ₽',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
+                if (me?.premiumActive == true) ...[
+                  Text(
+                    'OFFLAG PREMIUM',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Хватит до: ${_enoughUntil(me)}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.white70),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            useSafeArea: true,
-                            isScrollControlled: true,
-                            showDragHandle: true,
-                            backgroundColor: kBg,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(kRadiusXXL),
-                              ),
-                            ),
-                            builder: (_) => TopUpSheet(
-                              onPaymentStarted:
-                              _startAutoRefreshAfterPayment,
-                            ),
-                          );
-                        },
-                        child:
-                        const Center(child: Text('Пополнить')),
-                      ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Осталось пользователей: ${me?.premiumUsersLeft ?? 0}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Осталось дней: ${me?.premiumDaysLeft ?? 0}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _openDisablePremiumDialog,
+                      child: const Text('Отключить премиум'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _openPromoDialog,
-                        style: OutlinedButton.styleFrom(alignment: Alignment.center),
-                        child: const Center(
-                          child: Text(
-                            'Ввести промокод',
-                            textAlign: TextAlign.center,
+                  ),
+                ] else ...[
+                  Text(
+                    'Баланс',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${_fmtMoney(me?.balance ?? 0)} ₽',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Хватит до: ${_enoughUntil(me)}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.white70),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                if (me?.premiumActive != true) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            showModalBottomSheet(
+                              context: context,
+                              useSafeArea: true,
+                              isScrollControlled: true,
+                              showDragHandle: true,
+                              backgroundColor: kBg,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(kRadiusXXL),
+                                ),
+                              ),
+                              builder: (_) => TopUpSheet(
+                                onPaymentStarted:
+                                _startAutoRefreshAfterPayment,
+                              ),
+                            );
+                          },
+                          child:
+                          const Center(child: Text('Пополнить')),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _openPromoDialog,
+                          style: OutlinedButton.styleFrom(alignment: Alignment.center),
+                          child: const Center(
+                            child: Text(
+                              'Ввести промокод',
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _openPremiumDialog,
+                      style: OutlinedButton.styleFrom(alignment: Alignment.center),
+                      child: const Text('Ввести премиум-код'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ],
             ),
           ),

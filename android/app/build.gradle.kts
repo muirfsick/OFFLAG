@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -30,11 +32,43 @@ android {
         versionName = flutter.versionName
     }
 
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val keystoreProps = Properties()
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.inputStream().use { keystoreProps.load(it) }
+    }
+
+    val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+
+    signingConfigs {
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                val storeFilePath = keystoreProps["storeFile"] as String?
+                val storePasswordValue = keystoreProps["storePassword"] as String?
+                val keyAliasValue = keystoreProps["keyAlias"] as String?
+                val keyPasswordValue = keystoreProps["keyPassword"] as String?
+                if (storeFilePath.isNullOrBlank() ||
+                    storePasswordValue.isNullOrBlank() ||
+                    keyAliasValue.isNullOrBlank() ||
+                    keyPasswordValue.isNullOrBlank()
+                ) {
+                    throw GradleException("keystore.properties is missing required values: storeFile, storePassword, keyAlias, keyPassword")
+                }
+                storeFile = file(storeFilePath)
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        } else if (isReleaseBuild) {
+            throw GradleException("Missing keystore.properties for release signing")
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (keystorePropsFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 }

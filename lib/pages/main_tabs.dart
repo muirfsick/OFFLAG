@@ -205,6 +205,8 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     }
 
     // Включение — нужна текущая нода.
+    _bestNode = null;
+    await _loadVpn(fast: true);
     var node = _bestNode;
 
     if (node == null) {
@@ -217,7 +219,7 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     }
 
     if (node == null) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Нет доступных серверов')),
       );
@@ -226,7 +228,7 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
 
     final ok = await _vpn.connect(node);
 
-    if (!context.mounted) return;
+    if (!mounted) return;
 
     if (ok) {
       setState(() => _connected = true);
@@ -243,10 +245,12 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
   /// Открывает экран "Серверы", позволяет выбрать ноду и подключиться к ней.
   Future<void> _openServers(BuildContext context) async {
     final selected = await Navigator.of(context).push<VpnNode>(
-      MaterialPageRoute(builder: (_) => const ServersPage()),
+      MaterialPageRoute(
+        builder: (_) => ServersPage(includeAll: _me?.premiumActive ?? false),
+      ),
     );
 
-    if (!context.mounted || selected == null) return;
+    if (!mounted || selected == null) return;
 
     setState(() {
       _bestNode = selected;
@@ -256,7 +260,7 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     // Если были подключены — сначала отключаемся
     if (_connected) {
       await _vpn.disconnect();
-      if (!context.mounted) return;
+      if (!mounted) return;
       setState(() => _connected = false);
     }
 
