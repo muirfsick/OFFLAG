@@ -78,6 +78,7 @@ class VpnController {
   StreamSubscription<VlessStatus>? _v2raySub;
   bool _androidInitialized = false;
   static const List<String> _kAndroidDnsServers = ['1.1.1.1', '8.8.8.8'];
+  String? _lastNodeKey;
 
   /// Реактивный статус (true — VPN запущен).
   final ValueNotifier<bool> _status = ValueNotifier<bool>(false);
@@ -484,28 +485,37 @@ class VpnController {
 
   // ---------------- Android ----------------
   Future<void> _ensureAndroidInitialized() async {
-    if (_androidInitialized) return;
-    await _v2ray.initializeVless();
-    _v2raySub = _v2ray.onStatusChanged.listen((status) {
-      _status.value = status.state == 'CONNECTED';
-    });
-    _androidInitialized = true;
+    if (!_androidInitialized) {
+      await _v2ray.initializeVless(
+        notificationIconResourceType: "drawable",
+        notificationIconResourceName: "ic_vpn_notify",
+      );
+      _androidInitialized = true;
+    }
+    if (_v2raySub == null) {
+      _v2raySub = _v2ray.onStatusChanged.listen((status) {
+        _status.value = status.state == 'CONNECTED';
+      });
+    }
   }
 
   Future<bool> _connectAndroid(VpnNode node) async {
-    if (_status.value) return true;
+    final nodeKey = _nodeKey(node);
+    if (_status.value && _lastNodeKey == nodeKey) return true;
 
     try {
+      if (_status.value && _lastNodeKey != nodeKey) {
+        await _disconnectAndroid();
+      }
       await _ensureAndroidInitialized();
       final allowed = await _v2ray.requestPermission();
       if (!allowed) return false;
 
-      debugPrint('[VpnController][Android] node id=${node.id} name="${node.name}"');
-      debugPrint('[VpnController][Android] serverHost="${node.serverHost}" baseUrl="${node.baseUrl}"');
-      debugPrint('[VpnController][Android] uuid="${node.uuid}" publicKey="${node.publicKey}" shortId="${node.shortId}"');
-
       final url = _buildVlessUrl(node);
-      debugPrint('[VpnController][Android] vless url: $url');
+      if (url.isEmpty) {
+        debugPrint('[VpnController][Android] missing VLESS params for node id=${node.id}');
+        return false;
+      }
       final parsed = FlutterV2ray.parseFromURL(url);
       final config = _applyDnsOverrides(
         parsed.getFullConfiguration(),
@@ -513,15 +523,14 @@ class VpnController {
       );
       final remark = parsed.remark.isNotEmpty ? parsed.remark : node.name;
 
-      debugPrint('[VpnController][Android] config preview: ${config.length} bytes');
-
       await _v2ray.startVless(
         remark: remark,
         config: config,
-        bypassSubnets: const ['0.0.0.0/0', '::/0'],
+        bypassSubnets: const [],
         dnsServers: _kAndroidDnsServers,
       );
 
+      _lastNodeKey = nodeKey;
       return true;
     } catch (e, st) {
       debugPrint('[VpnController][Android] failed to start: $e\n$st');
@@ -553,19 +562,31 @@ class VpnController {
     }
   }
 
+  String _nodeKey(VpnNode node) {
+    return [
+      node.id.toString(),
+      node.serverHost,
+      node.serverPort.toString(),
+      node.baseUrl,
+      node.uuid,
+      node.publicKey,
+      node.shortId,
+    ].join('|');
+  }
+
   String _buildVlessUrl(VpnNode node) {
     final serverHost = node.serverHost.isNotEmpty
         ? node.serverHost
         : Uri.tryParse(node.baseUrl)?.host ?? '';
     final serverPort = node.serverPort != 0 ? node.serverPort : 443;
-    final uuid = node.uuid.isNotEmpty
-        ? node.uuid
-        : 'db31c862-ca3a-4b08-84a2-570193e69f3e';
-    final publicKey = node.publicKey.isNotEmpty
-        ? node.publicKey
-        : '72TobKObJ8FRwoL31wFaEWIyihSiFEZYjtZCe8RT-Vg';
-    final shortId = node.shortId.isNotEmpty ? node.shortId : '26';
+    final uuid = node.uuid;
+    final publicKey = node.publicKey;
+    final shortId = node.shortId;
     final remark = Uri.encodeComponent(node.name);
+
+    if (serverHost.isEmpty || uuid.isEmpty || publicKey.isEmpty || shortId.isEmpty) {
+      return '';
+    }
 
     return 'vless://$uuid@$serverHost:$serverPort?'
         'type=xhttp&encryption=none&security=reality&pbk=$publicKey'

@@ -16,6 +16,7 @@ class UserProfile {
   final int premiumUsersLeft;
   final int premiumDaysLeft;
   final DateTime? premiumExpiresAt;
+  final bool yookassaEnabled;
 
   UserProfile({
     required this.id,
@@ -34,6 +35,7 @@ class UserProfile {
     required this.premiumUsersLeft,
     required this.premiumDaysLeft,
     required this.premiumExpiresAt,
+    required this.yookassaEnabled,
   });
 
   factory UserProfile.fromMap(Map m) {
@@ -49,6 +51,7 @@ class UserProfile {
 
     final plan = (m['plan'] ?? {}) as Map;
     final premium = (m['premium'] ?? {}) as Map;
+    final payments = (m['payments'] ?? {}) as Map;
 
     return UserProfile(
       id: int.tryParse('${m['id'] ?? 0}') ?? 0,
@@ -67,6 +70,7 @@ class UserProfile {
       premiumUsersLeft: int.tryParse('${premium['users_left'] ?? 0}') ?? 0,
       premiumDaysLeft: int.tryParse('${premium['days_left'] ?? 0}') ?? 0,
       premiumExpiresAt: _dt(premium['expires_at']),
+      yookassaEnabled: payments['yookassa_enabled'] == true,
     );
   }
 

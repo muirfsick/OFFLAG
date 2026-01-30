@@ -76,25 +76,18 @@ Future<void> generateSingboxConfig({
 
   // Для dev / страховки оставим фоллбеки,
   // чтобы конфиг не был пустым, если бэк ещё не настроен до конца.
-  final uuid = node.uuid.isNotEmpty
-      ? node.uuid
-      : 'db31c862-ca3a-4b08-84a2-570193e69f3e';
+  final uuid = node.uuid;
+  final publicKey = node.publicKey;
+  final shortId = node.shortId;
 
-  final publicKey = node.publicKey.isNotEmpty
-      ? node.publicKey
-      : '72TobKObJ8FRwoL31wFaEWIyihSiFEZYjtZCe8RT-Vg';
-
-  final shortId = node.shortId.isNotEmpty ? node.shortId : '26';
-
-  debugPrint(
-    '[config] node #${node.id} host=$serverHost:$serverPort '
-        'uuid=$uuid pk=$publicKey sid=$shortId',
-  );
+  if (serverHost.isEmpty || uuid.isEmpty || publicKey.isEmpty || shortId.isEmpty) {
+    throw StateError('VLESS params missing for node id=${node.id}');
+  }
 
   // 4) собираем полный конфиг
   final Map<String, dynamic> config = {
     'log': {
-      'level': 'debug',
+      'level': 'warning',
       'timestamp': true,
     },
     'dns': {

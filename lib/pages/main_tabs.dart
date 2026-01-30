@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme.dart';
 import '../widgets/widgets.dart';
 import '../net.dart';
@@ -31,6 +33,9 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
   VpnNode? _bestNode;
   int? _bestPingMs;
   bool _loadingVpn = false;
+  bool _connectBusy = false;
+  bool _connectDialogShown = false;
+  bool _startupChecksDone = false;
 
   /// Универсальный контроллер VPN (Windows + Android).
   final VpnController _vpn = VpnController();
@@ -72,11 +77,167 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
           ? (res.data as Map<String, dynamic>)
           : <String, dynamic>{};
       setState(() => _me = UserProfile.fromMap(data));
+      if (!_startupChecksDone) {
+        _startupChecksDone = true;
+        unawaited(_runStartupChecks());
+      }
     } catch (e, st) {
       debugPrint('GET /profile failed: $e\n$st');
     } finally {
       if (mounted) setState(() => _loadingMe = false);
     }
+  }
+
+  Future<void> _runStartupChecks() async {
+    await _checkVersion();
+    await _checkAnnouncement();
+  }
+
+  Future<void> _checkVersion() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    final info = await PackageInfo.fromPlatform();
+    final build = int.tryParse(info.buildNumber) ?? 0;
+    final platform = Platform.isAndroid ? 'android' : 'ios';
+    final data = await checkAppVersion(platform: platform, versionCode: build);
+    final forceUpdate = data['force_update'] == true;
+    final updateAvailable = data['update_available'] == true;
+    if ((!forceUpdate && !updateAvailable) || !mounted) return;
+
+    final message = (data['message'] as String?)?.trim();
+    final url = (data['url'] as String?)?.trim();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !forceUpdate,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                forceUpdate ? 'Требуется обновление' : 'Доступно обновление',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message?.isNotEmpty == true
+                    ? message!
+                    : (forceUpdate
+                        ? 'Для продолжения работы обновите приложение.'
+                        : 'Рекомендуем обновить приложение до последней версии.'),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Spacer(),
+                  if (!forceUpdate)
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Позже'),
+                    ),
+                  TextButton(
+                    onPressed: () async {
+                      if (url != null && url.isNotEmpty) {
+                        final normalized = _normalizeUrl(url);
+                        if (normalized != null) {
+                          await launchUrl(normalized, mode: LaunchMode.externalApplication);
+                        }
+                      }
+                    },
+                    child: const Text('Перейти'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _checkAnnouncement() async {
+    final ann = await fetchAnnouncementNext();
+    if (!mounted || ann == null) return;
+    final id = (ann['id'] as int?) ?? 0;
+    final title = (ann['title'] as String?) ?? '';
+    final body = (ann['body'] as String?) ?? '';
+    final imageUrl = (ann['image_url'] as String?) ?? '';
+    final ctaUrl = (ann['cta_url'] as String?) ?? '';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title.isEmpty ? 'Объявление' : title,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      if (id > 0) await markAnnouncementRead(id);
+                    },
+                  ),
+                ],
+              ),
+              if (imageUrl.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(imageUrl),
+                ),
+              ],
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(body),
+              ],
+              if (ctaUrl.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        if (id > 0) await markAnnouncementRead(id);
+                        final normalized = _normalizeUrl(ctaUrl);
+                        if (normalized != null) {
+                          await launchUrl(normalized, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      child: const Text('Перейти'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Uri? _normalizeUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final withScheme = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    return Uri.tryParse(withScheme);
   }
 
   Future<void> _loadVpn({bool fast = false}) async {
@@ -132,61 +293,8 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     });
   }
 
-  Future<void> _waitForVpnLoad() async {
-    // Wait until the initial node scan finishes.
-    while (_loadingVpn && mounted) {
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
-  }
 
-  Future<VpnNode?> _ensureBestNode({int attempts = 3}) async {
-    for (var i = 0; i < attempts && mounted; i++) {
-      if (_bestNode != null) return _bestNode;
 
-      if (_loadingVpn) {
-        await _waitForVpnLoad();
-      } else {
-        await _loadVpn(fast: true);
-      }
-
-      if (_bestNode != null) return _bestNode;
-
-      // Short backoff before next attempt.
-      await Future.delayed(const Duration(milliseconds: 700));
-    }
-    return _bestNode;
-  }
-
-  VoidCallback _showFindingServerDialog() {
-    final nav = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              SizedBox(width: 10),
-              Text('Ищем лучший сервер...', textAlign: TextAlign.center),
-            ],
-          ),
-        ),
-      ),
-    );
-    return () {
-      if (nav.canPop()) nav.pop();
-    };
-  }
 
   /// Переключает VPN: запускает или останавливает подключение.
   ///
@@ -194,9 +302,13 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
   /// - Windows: xray.exe (TUN)
   /// - Android: VpnService + flutter_v2ray_plus
   void _toggleConnection() async {
-    // Отключение
+    if (_connectBusy) return;
+
+    // Disconnect
     if (_connected) {
+      setState(() => _connectBusy = true);
       await _vpn.disconnect();
+      if (mounted) setState(() => _connectBusy = false);
 
       if (mounted) {
         setState(() => _connected = false);
@@ -204,21 +316,21 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
       return;
     }
 
-    // Включение — нужна текущая нода.
-    _bestNode = null;
-    await _loadVpn(fast: true);
+    // Connect using the last selected node without waiting for pings.
+    setState(() => _connectBusy = true);
     var node = _bestNode;
-
     if (node == null) {
-      final closeDialog = _showFindingServerDialog();
       try {
-        node = await _ensureBestNode(attempts: 3);
-      } finally {
-        if (mounted) closeDialog();
-      }
+        final nodes = await fetchVpnNodes();
+        if (nodes.isNotEmpty) {
+          node = nodes.first;
+          _bestNode = node;
+        }
+      } catch (_) {}
     }
 
     if (node == null) {
+      if (mounted) setState(() => _connectBusy = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Нет доступных серверов')),
@@ -227,6 +339,7 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     }
 
     final ok = await _vpn.connect(node);
+    if (mounted) setState(() => _connectBusy = false);
 
     if (!mounted) return;
 
@@ -240,10 +353,13 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
         ),
       );
     }
-  }
 
+    // Refresh best node in background without blocking the user.
+    unawaited(_loadVpn(fast: true));
+  }
   /// Открывает экран "Серверы", позволяет выбрать ноду и подключиться к ней.
   Future<void> _openServers(BuildContext context) async {
+    if (_connectBusy) return;
     final selected = await Navigator.of(context).push<VpnNode>(
       MaterialPageRoute(
         builder: (_) => ServersPage(includeAll: _me?.premiumActive ?? false),
@@ -251,20 +367,30 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     );
 
     if (!mounted || selected == null) return;
-
+    if (_connectBusy) return;
     setState(() {
       _bestNode = selected;
       _bestPingMs = selected.pingMs ?? _bestPingMs;
     });
 
-    // Если были подключены — сначала отключаемся
-    if (_connected) {
-      await _vpn.disconnect();
-      if (!mounted) return;
-      setState(() => _connected = false);
-    }
+    setState(() => _connectBusy = true);
+    _showConnectingDialog();
+    bool ok = false;
+    try {
+      // Disconnect if already connected.
+      if (_connected) {
+        await _vpn.disconnect();
+        if (!mounted) return;
+        setState(() => _connected = false);
+        // Небольшая задержка, чтобы дать время на корректное отключение.
+        await Future.delayed(const Duration(milliseconds: 700));
+      }
 
-    final ok = await _vpn.connect(selected);
+      ok = await _vpn.connect(selected);
+    } finally {
+      if (mounted) setState(() => _connectBusy = false);
+      _hideConnectingDialog();
+    }
 
     if (!context.mounted) return;
 
@@ -277,6 +403,45 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
         ),
       );
     }
+  }
+
+  void _showConnectingDialog() {
+    if (_connectDialogShown || !mounted) return;
+    _connectDialogShown = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      builder: (ctx) => Dialog(
+        backgroundColor: kSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kRadiusXXL)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+          child: Row(
+            children: const [
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.6),
+              ),
+              SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  'Выполняется подключение...',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _hideConnectingDialog() {
+    if (!_connectDialogShown || !mounted) return;
+    _connectDialogShown = false;
+    Navigator.of(context, rootNavigator: true).maybePop();
   }
 
   @override
@@ -334,4 +499,5 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
       ),
     );
   }
+
 }

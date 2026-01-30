@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme.dart';
@@ -284,8 +285,21 @@ class _TopUpSheetState extends State<TopUpSheet> {
       }
     } catch (e) {
       if (!ctx.mounted) return;
+      String msg = 'Ошибка при создании платежа';
+      if (e is DioException) {
+        final status = e.response?.statusCode;
+        if (e.response?.data is Map) {
+          final data = e.response?.data as Map;
+          final err = data['error']?.toString().trim();
+          if (err != null && err.isNotEmpty) {
+            msg = err;
+          }
+        } else if (status == 503) {
+          msg = 'Оплата временно недоступна';
+        }
+      }
       ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('Ошибка при создании платежа')),
+        SnackBar(content: Text(msg)),
       );
     } finally {
       if (mounted) {

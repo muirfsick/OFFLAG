@@ -59,6 +59,7 @@ class HomeScreen extends StatelessWidget {
     final monthly = (me?.effectivePrice ?? 0) > 0 ? me!.effectivePrice : 60.0;
     final dailyCost = monthly / 30.0;
     final hasPremium = me?.premiumActive == true;
+    final paymentsEnabled = me?.yookassaEnabled ?? true;
     final canUse = hasPremium || (me?.balance ?? 0.0) >= dailyCost;
 
     return RefreshIndicator(
@@ -133,14 +134,19 @@ class HomeScreen extends StatelessWidget {
           Center(
             child: SizedBox(
               width: Ui.tumblerWidth(context),
-              child: OnOffSwitch(
-                value: connected,
-                enabled: canUse,
-                onBlocked: () => _showTopUp(context, dailyCost),
-                onChanged: (_) => onToggleConnection(),
+                child: OnOffSwitch(
+                  value: connected,
+                  enabled: true,
+                  onChanged: (_) {
+                    if (!canUse) {
+                      _showTopUp(context, dailyCost, paymentsEnabled);
+                      return;
+                    }
+                    onToggleConnection();
+                  },
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 11),
           Center(
             child: SizedBox(
@@ -213,7 +219,13 @@ class HomeScreen extends StatelessWidget {
 
   /// Показывает модальное окно с требованием пополнить баланс,
   /// если на счёте меньше дневной стоимости [dailyCost].
-  void _showTopUp(BuildContext context, double dailyCost) {
+  void _showTopUp(BuildContext context, double dailyCost, bool paymentsEnabled) {
+    if (!paymentsEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Оплата временно недоступна')),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

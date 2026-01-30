@@ -47,14 +47,13 @@ Future<void> generateXrayConfig({
 
   final serverPort = node.serverPort != 0 ? node.serverPort : 443;
 
-  final uuid =
-      node.uuid.isNotEmpty ? node.uuid : 'db31c862-ca3a-4b08-84a2-570193e69f3e';
+  final uuid = node.uuid;
+  final publicKey = node.publicKey;
+  final shortId = node.shortId;
 
-  final publicKey = node.publicKey.isNotEmpty
-      ? node.publicKey
-      : '72TobKObJ8FRwoL31wFaEWIyihSiFEZYjtZCe8RT-Vg';
-
-  final shortId = node.shortId.isNotEmpty ? node.shortId : '26';
+  if (serverHost.isEmpty || uuid.isEmpty || publicKey.isEmpty || shortId.isEmpty) {
+    throw StateError('VLESS params missing for node id=${node.id}');
+  }
 
   final sockopt = <String, dynamic>{};
   if (outboundInterface != null && outboundInterface.trim().isNotEmpty) {

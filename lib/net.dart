@@ -125,6 +125,34 @@ Future<List<VpnNode>> fetchVpnNodes({bool includeAll = false}) async {
   return data.map((e) => VpnNode.fromJson(e as Map<String, dynamic>)).toList();
 }
 
+/// Получить следующее объявление (если есть).
+Future<Map<String, dynamic>?> fetchAnnouncementNext() async {
+  final resp = await dio.get('/announcements/next');
+  if (resp.statusCode == 204 || resp.data == null || resp.data == '') return null;
+  if (resp.data is Map) {
+    return (resp.data as Map).cast<String, dynamic>();
+  }
+  return null;
+}
+
+Future<void> markAnnouncementRead(int announcementId) async {
+  await dio.post('/announcements/read', data: {'announcement_id': announcementId});
+}
+
+Future<Map<String, dynamic>> checkAppVersion({
+  required String platform,
+  required int versionCode,
+}) async {
+  final resp = await dio.get(
+    '/app/version',
+    queryParameters: {
+      'platform': platform,
+      'version_code': versionCode.toString(),
+    },
+  );
+  return (resp.data as Map).cast<String, dynamic>();
+}
+
 /// Измеряем "пинг" как минимум из нескольких TCP-подключений к host:port.
 /// Возвращаем среднее значение по успешным попыткам,
 /// с минимальным визуальным порогом (например, 42 мс).

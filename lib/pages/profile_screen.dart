@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme.dart';
@@ -46,11 +47,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Сколько раз уже дернули onRefreshMe() в рамках авто-обновления.
   int _autoRefreshAttempts = 0;
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) return;
+    setState(() => _appVersion = '${info.version}+${info.buildNumber}');
   }
 
   /// Форматирует денежную сумму с разделителями тысяч и 0/2 знаками после запятой.
@@ -272,9 +286,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   /// Открывает внешний URL в браузере.
   Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
+    final normalized = _normalizeUrl(url);
+    if (normalized == null) return;
     final ok = await launchUrl(
-      uri,
+      normalized,
       mode: LaunchMode.externalApplication,
     );
     if (!ok && mounted) {
@@ -282,6 +297,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(content: Text('Не удалось открыть ссылку')),
       );
     }
+  }
+
+  Uri? _normalizeUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final withScheme = trimmed.contains('://') ? trimmed : 'https://$trimmed';
+    return Uri.tryParse(withScheme);
   }
 
   /// Модалка с юридическими документами.
@@ -514,24 +536,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
-                            showModalBottomSheet(
-                              context: context,
-                              useSafeArea: true,
-                              isScrollControlled: true,
-                              showDragHandle: true,
-                              backgroundColor: kBg,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(kRadiusXXL),
+                          onPressed: (me?.yookassaEnabled ?? true)
+                              ? () {
+                              showModalBottomSheet(
+                                context: context,
+                                useSafeArea: true,
+                                isScrollControlled: true,
+                                showDragHandle: true,
+                                backgroundColor: kBg,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(kRadiusXXL),
+                                  ),
                                 ),
-                              ),
-                              builder: (_) => TopUpSheet(
-                                onPaymentStarted:
-                                _startAutoRefreshAfterPayment,
-                              ),
-                            );
-                          },
+                                builder: (_) => TopUpSheet(
+                                  onPaymentStarted:
+                                  _startAutoRefreshAfterPayment,
+                                ),
+                              );
+                            }
+                              : null,
                           child:
                           const Center(child: Text('Пополнить')),
                         ),
@@ -600,6 +624,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+          if (_appVersion.isNotEmpty)
+            Center(
+              child: Text(
+                'Версия приложения: $_appVersion',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.white70),
+              ),
+            ),
         ],
       ),
     );
