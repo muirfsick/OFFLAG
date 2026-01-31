@@ -166,12 +166,28 @@ class _CodeScreenState extends State<CodeScreen> with SingleTickerProviderStateM
       _setStateWithAutoReset(_CodeState.ok, ms: 500);
 
       if (data['new_user'] == true) {
-        // новый пользователь — идём на экран ввода имени
+        final token = data['token'] as String?;
+        final refresh = data['refresh_token'] as String?;
+        if (token == null || token.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Token missing. Please try again.')),
+          );
+          return;
+        }
+
+        Session.token = token;
+        Session.email = widget.email;
+        await TokenStore.save(token, widget.email, refreshToken: refresh);
+
+        // New user -> go to nickname screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => AuthNamePage(email: widget.email)),
         );
       } else {
+
+
+
         // существующий пользователь — сразу получаем токен
         final token = data['token'] as String?;
         final refresh = data['refresh_token'] as String?;

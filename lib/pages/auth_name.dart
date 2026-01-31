@@ -60,29 +60,28 @@ class _AuthNamePageState extends State<AuthNamePage> {
     setState(() => _loading = true);
     try {
       final res = await dio.post('/set_nickname', data: {
-        'email': widget.email,
         'nickname': nickname,
-        'device': 'FlutterApp',
       });
 
       final data = res.data is Map ? (res.data as Map) : {};
       final token = (data['token'] ?? '') as String;
       final refresh = (data['refresh_token'] ?? '') as String;
+      final effectiveToken = token.isNotEmpty ? token : (Session.token ?? '');
 
       if (!mounted) return;
-      if (token.isEmpty) {
+      if (effectiveToken.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не получен токен. Повторите ещё раз.')),
+          const SnackBar(content: Text('Token missing. Please try again.')),
         );
         return;
       }
 
-      // Сохраняем в Session для работы dio
-      Session.token = token;
+      // Save token for dio
+      Session.token = effectiveToken;
       Session.email = widget.email;
 
-      // И ПЕРСИСТИМ токен в SharedPreferences 👇
-      await TokenStore.save(token, widget.email, refreshToken: refresh);
+      // Persist token
+      await TokenStore.save(effectiveToken, widget.email, refreshToken: refresh.isNotEmpty ? refresh : null);
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(

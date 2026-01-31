@@ -486,10 +486,7 @@ class VpnController {
   // ---------------- Android ----------------
   Future<void> _ensureAndroidInitialized() async {
     if (!_androidInitialized) {
-      await _v2ray.initializeVless(
-        notificationIconResourceType: "drawable",
-        notificationIconResourceName: "ic_vpn_notify",
-      );
+      await _v2ray.initializeVless();
       _androidInitialized = true;
     }
     if (_v2raySub == null) {

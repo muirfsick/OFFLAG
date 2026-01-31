@@ -47,6 +47,8 @@ Desktop.ini
 *.key
 *.p12
 *.keystore
+android/keystore.properties
+**/*.jks
 **/google-services.json
 **/firebase_options.dart
 
