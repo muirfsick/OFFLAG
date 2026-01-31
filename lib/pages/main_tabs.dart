@@ -22,6 +22,12 @@ class MainTabs extends StatefulWidget {
 }
 
 class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
+  static const List<String> _kAllowedExternalDomains = [
+    'play.google.com',
+    'play.app.goo.gl',
+    'api.lisovcoff.ru',
+    'offlag.ru',
+  ];
   int _index = 0;
   bool _connected = false;
 
@@ -233,11 +239,27 @@ class _MainTabsState extends State<MainTabs> with TickerProviderStateMixin {
     );
   }
 
+  bool _isAllowedHost(String host) {
+    if (host.isEmpty) return false;
+    final h = host.toLowerCase();
+    for (final d in _kAllowedExternalDomains) {
+      if (h == d || h.endsWith('.$d')) return true;
+    }
+    return false;
+  }
+
   Uri? _normalizeUrl(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
     final withScheme = trimmed.contains('://') ? trimmed : 'https://$trimmed';
-    return Uri.tryParse(withScheme);
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null) return null;
+    if (uri.scheme != 'https') return null;
+    if (!_isAllowedHost(uri.host)) {
+      debugPrint('Blocked external URL: ${uri.host}');
+      return null;
+    }
+    return uri;
   }
 
   Future<void> _loadVpn({bool fast = false}) async {
